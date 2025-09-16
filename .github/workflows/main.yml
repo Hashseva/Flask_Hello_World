@@ -1,42 +1,36 @@
 name: Docker + ngrok Preview
 on:
-  workflow_dispatch: {}
-  # or:
-  # push:
-  #   branches: [ main, master ]
+  push:
+    branches: [ main, master ]
 
 jobs:
   deploy-preview:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Build Docker image
-        run: docker build -t flask-app .
+    - name: Build Docker image
+      run: docker build -t flask-app .
 
-      - name: Run Flask app with ngrok (120s)
-        env:
-          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt-get update && sudo apt-get install -y ngrok
+    - name: Run Flask app with ngrok
+      run: |
+        sudo apt update
+        sudo apt install -y curl
+        curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+        echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+        sudo apt update && sudo apt install -y ngrok
 
-          ngrok config add-authtoken "$NGROK_AUTHTOKEN"
+        ngrok config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
 
-          docker run -d -p 5000:5000 --name flask-container flask-app
-          sleep 5
+        docker run -d -p 5000:5000 --name flask-container flask-app
+        sleep 5
 
-          ngrok http 5000 --log=stdout &
-          # Give the api a moment to come up
-          for i in {1..10}; do
-            if curl -s http://localhost:4040/api/tunnels >/dev/null; then break; fi
-            sleep 1
-          done
-          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*https[^"]*' | cut -d'"' -f4)
-          echo "🌐 URL publique : $NGROK_URL"
+        ngrok http 5000 --log=stdout &
+        sleep 10
 
-          sleep 120
+        NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*https[^"]*' | cut -d'"' -f4)
+        echo "🌐 URL publique : $NGROK_URL"
+
+        sleep 120
